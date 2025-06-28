@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>一次エネルギー消費量のグラフ化（インタラクティブ版）</title>
+    <!-- Tailwind CSSを読み込み -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js と Datalabels Plugin を読み込み -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
+    <!-- PDF出力用のライブラリを読み込み -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap');
+        body {
+            font-family: 'Noto Sans JP', 'Inter', sans-serif;
+        }
+        /* 入力フィールドの矢印を非表示にする */
+        input[type=number]::-webkit-inner-spin-button,
+        input[type=number]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type=number] {
+            -moz-appearance: textfield;
+        }
+        /* 印刷時にボタンを非表示にする */
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 p-4 sm:p-6 lg:p-8">
+    <div class="max-w-4xl mx-auto">
+        <!-- PDF出力対象エリア -->
+        <div id="pdf-content" class="bg-white dark:bg-gray-800 p-8 pb-12 rounded-lg">
+            <header class="text-center mb-8">
+                <h1 class="text-3xl font-bold text-gray-900 dark:text-white">一次エネルギー消費量のグラフ化</h1>
+                <p class="mt-2 text-lg text-gray-600 dark:text-gray-400">「基準」「設計」「太陽光発電量」の比較（「その他」除く）</p>
+            </header>
+
+            <!-- メインコンテンツ -->
+            <div class="space-y-8">
+                 <!-- 入力コントロール -->
+                <div>
+                    <h2 class="text-2xl font-semibold mb-4 text-center text-gray-900 dark:text-white">入力値 (MJ)</h2>
+                    <div id="input-controls" class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <!-- 設計一次エネルギー -->
+                        <div>
+                            <h3 class="text-lg font-semibold text-blue-600 dark:text-blue-400 mb-2 text-center">設計一次エネルギー</h3>
+                            <div class="space-y-2">
+                                 <div class="flex justify-between items-center"><label for="design-0" class="text-sm">暖房設備:</label> <input type="number" id="design-0" class="w-1/2 bg-gray-100 dark:bg-gray-700 rounded p-1 text-right"></div>
+                                 <div class="flex justify-between items-center"><label for="design-1" class="text-sm">冷房設備:</label> <input type="number" id="design-1" class="w-1/2 bg-gray-100 dark:bg-gray-700 rounded p-1 text-right"></div>
+                                 <div class="flex justify-between items-center"><label for="design-2" class="text-sm">換気設備:</label> <input type="number" id="design-2" class="w-1/2 bg-gray-100 dark:bg-gray-700 rounded p-1 text-right"></div>
+                                 <div class="flex justify-between items-center"><label for="design-3" class="text-sm">給湯設備:</label> <input type="number" id="design-3" class="w-1/2 bg-gray-100 dark:bg-gray-700 rounded p-1 text-right"></div>
+                                 <div class="flex justify-between items-center"><label for="design-4" class="text-sm">照明設備:</label> <input type="number" id="design-4" class="w-1/2 bg-gray-100 dark:bg-gray-700 rounded p-1 text-right"></div>
+                            </div>
+                        </div>
+                        <!-- 基準一次エネルギー -->
+                        <div>
+                            <h3 class="text-lg font-semibold text-orange-600 dark:text-orange-400 mb-2 text-center">基準一次エネルギー</h3>
+                            <div class="space-y-2">
+                                 <div class="flex justify-between items-center"><label for="standard-0" class="text-sm">暖房設備:</label> <input type="number" id="standard-0" class="w-1/2 bg-gray-100 dark:bg-gray-700 rounded p-1 text-right"></div>
+                                 <div class="flex justify-between items-center"><label for="standard-1" class="text-sm">冷房設備:</label> <input type="number" id="standard-1" class="w-1/2 bg-gray-100 dark:bg-gray-700 rounded p-1 text-right"></div>
+                                 <div class="flex justify-between items-center"><label for="standard-2" class="text-sm">換気設備:</label> <input type="number" id="standard-2" class="w-1/2 bg-gray-100 dark:bg-gray-700 rounded p-1 text-right"></div>
+                                 <div class="flex justify-between items-center"><label for="standard-3" class="text-sm">給湯設備:</label> <input type="number" id="standard-3" class="w-1/2 bg-gray-100 dark:bg-gray-700 rounded p-1 text-right"></div>
+                                 <div class="flex justify-between items-center"><label for="standard-4" class="text-sm">照明設備:</label> <input type="number" id="standard-4" class="w-1/2 bg-gray-100 dark:bg-gray-700 rounded p-1 text-right"></div>
+                            </div>
+                        </div>
+                         <!-- 太陽光発電 -->
+                        <div>
+                            <h3 class="text-lg font-semibold text-green-600 dark:text-green-400 mb-2 text-center">太陽光発電</h3>
+                            <div class="space-y-2">
+                                <div class="flex justify-between items-center"><label for="solar" class="text-sm">総発電量:</label> <input type="number" id="solar" class="w-1/2 bg-gray-100 dark:bg-gray-700 rounded p-1 text-right"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- グラフとサマリー -->
+                <div class="border-t-2 border-gray-200 dark:border-gray-700 pt-8">
+                    <!-- グラフのコンテナ -->
+                    <div class="mb-8" style="height: 450px;">
+                        <canvas id="energyChart"></canvas>
+                    </div>
+
+                    <!-- サマリーカード -->
+                    <div class="border-t-2 border-gray-200 dark:border-gray-700 pt-6">
+                        <h2 class="text-2xl font-semibold mb-4 text-center text-gray-900 dark:text-white">計算結果（その他除く）</h2>
+                        <div class="space-y-4">
+                            <!-- Row 1: Main Summaries -->
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
+                               <div class="bg-orange-100 dark:bg-orange-900/50 p-4 rounded-xl">
+                                    <h3 class="text-lg font-semibold text-orange-800 dark:text-orange-300">基準一次合計</h3>
+                                    <p id="summary-standard" class="text-2xl font-bold text-orange-600 dark:text-orange-400 mt-2">0 <span class="text-base font-normal">MJ</span></p>
+                                </div>
+                                <div class="bg-blue-100 dark:bg-blue-900/50 p-4 rounded-xl">
+                                    <h3 class="text-lg font-semibold text-blue-800 dark:text-blue-300">設計一次合計</h3>
+                                     <p id="summary-design" class="text-2xl font-bold text-blue-600 dark:text-blue-400 mt-2">0 <span class="text-base font-normal">MJ</span></p>
+                                </div>
+                                <div class="bg-green-100 dark:bg-green-900/50 p-4 rounded-xl">
+                                    <h3 class="text-lg font-semibold text-green-800 dark:text-green-300">太陽光発電量</h3>
+                                    <p id="summary-solar" class="text-2xl font-bold text-green-600 dark:text-green-400 mt-2">0 <span class="text-base font-normal">MJ</span></p>
+                                </div>
+                            </div>
+                            <!-- Row 2: Reduction Rates -->
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-center">
+                                 <div class="bg-purple-100 dark:bg-purple-900/50 p-4 rounded-xl">
+                                    <h3 class="text-lg font-semibold text-purple-800 dark:text-purple-300">削減率(設計のみ)</h3>
+                                    <p id="summary-reduction-rate-design" class="text-2xl font-bold text-purple-600 dark:text-purple-400 mt-2">0.0 %</p>
+                                </div>
+                                <div class="bg-teal-100 dark:bg-teal-900/50 p-4 rounded-xl">
+                                    <h3 class="text-lg font-semibold text-teal-800 dark:text-teal-300">削減率(太陽光含)</h3>
+                                    <p id="summary-reduction-rate-solar" class="text-2xl font-bold text-teal-600 dark:text-teal-400 mt-2">0.0 %</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+             <footer class="text-center mt-8 text-sm text-gray-500 dark:text-gray-400">
+                <p>このデータは提供されたPDFファイル「一次エネルギー消費量計算結果」に基づいています。</p>
+            </footer>
+        </div>
+         <!-- PDF保存ボタン -->
+        <div class="text-center mt-6 no-print">
+            <button id="save-pdf-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition-colors duration-300">
+                PDFで保存
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // ライブラリをウィンドウオブジェクトに設定
+        const { jsPDF } = window.jspdf;
+        
+        // Chart.js Datalabels プラグインを登録
+        Chart.register(ChartDataLabels);
+
+        // 初期データ
+        const initialData = {
+            design: [13935, 6036, 5939, 27637, 5212],
+            standard: [13383, 5634, 4542, 25091, 10763],
+            solar: 48756
+        };
+        const labels = ['暖房設備', '冷房設備', '換気設備', '給湯設備', '照明設備'];
+        const consumptionColors = [
+            'rgba(255, 99, 132, 0.7)',  'rgba(54, 162, 235, 0.7)', 'rgba(255, 206, 86, 0.7)',
+            'rgba(75, 192, 192, 0.7)',  'rgba(153, 102, 255, 0.7)'
+        ];
+        const generationColor = 'rgba(34, 197, 94, 0.7)';
+
+        const ctx = document.getElementById('energyChart').getContext('2d');
+        
+        const consumptionDatasets = labels.map((label, i) => ({
+            label: label,
+            data: [initialData.standard[i], initialData.design[i], 0],
+            backgroundColor: consumptionColors[i],
+        }));
+
+        const solarDataset = {
+            label: '太陽光発電量',
+            data: [0, 0, initialData.solar],
+            backgroundColor: generationColor
+        };
+        
+        let energyChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['基準一次エネルギー', '設計一次エネルギー', '太陽光発電量'],
+                datasets: [...consumptionDatasets.slice().reverse(), solarDataset]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: false, // PDF出力時のアニメーションを無効化
+                plugins: {
+                    title: { display: false },
+                    legend: { position: 'top', labels: { color: document.body.classList.contains('dark') ? '#FFFFFF' : '#333333', font: { size: 12 } } },
+                    datalabels: {
+                        color: '#fff',
+                        font: { weight: 'bold' },
+                        formatter: (value) => value > 0 ? new Intl.NumberFormat('ja-JP').format(value) : ''
+                    },
+                },
+                scales: {
+                    y: { stacked: true, beginAtZero: true, title: { display: true, text: '一次エネルギー (MJ)', font: { size: 14, weight: 'bold' } } },
+                    x: { stacked: true }
+                }
+            }
+        });
+
+        // 入力フィールドのイベントリスナー
+        document.getElementById('input-controls').addEventListener('input', updateChartAndSummaries);
+        
+        // PDF保存ボタンのイベントリスナー
+        document.getElementById('save-pdf-btn').addEventListener('click', () => {
+             const element = document.getElementById('pdf-content');
+             const btn = document.getElementById('save-pdf-btn');
+             btn.textContent = '作成中...';
+             btn.disabled = true;
+
+             html2canvas(element, {
+                 scale: 2, // 高解像度でキャプチャ
+                 useCORS: true,
+                 onclone: (doc) => {
+                     // ダークモードが適用されている場合、PDFではライトモードに強制
+                     const body = doc.querySelector('body');
+                     const pdfContent = doc.querySelector('#pdf-content');
+                     if (body.classList.contains('dark')) {
+                        pdfContent.classList.remove('dark:bg-gray-800');
+                        pdfContent.classList.add('bg-white');
+                     }
+                 }
+             }).then(canvas => {
+                 const imgData = canvas.toDataURL('image/png');
+                 const pdf = new jsPDF({
+                     orientation: 'portrait',
+                     unit: 'mm',
+                     format: 'a4'
+                 });
+                 
+                 const pdfWidth = pdf.internal.pageSize.getWidth();
+                 const pdfHeight = pdf.internal.pageSize.getHeight();
+                 const canvasWidth = canvas.width;
+                 const canvasHeight = canvas.height;
+                 const ratio = canvasWidth / canvasHeight;
+                 
+                 let imgWidth = pdfWidth - 20; // A4の余白を考慮
+                 let imgHeight = imgWidth / ratio;
+                 
+                 // 画像がA4の高さを超える場合は高さを基準に調整
+                 if(imgHeight > pdfHeight - 20) {
+                    imgHeight = pdfHeight - 20;
+                    imgWidth = imgHeight * ratio;
+                 }
+
+                 const x = (pdfWidth - imgWidth) / 2;
+                 const y = 10;
+
+                 pdf.addImage(imgData, 'PNG', x, y, imgWidth, imgHeight);
+                 pdf.save('primary-energy-report.pdf');
+                 
+                 btn.textContent = 'PDFで保存';
+                 btn.disabled = false;
+             });
+        });
+
+        function updateChartAndSummaries() {
+            const newDesignData = labels.map((_, i) => parseFloat(document.getElementById(`design-${i}`).value) || 0);
+            const newStandardData = labels.map((_, i) => parseFloat(document.getElementById(`standard-${i}`).value) || 0);
+            const newSolarData = parseFloat(document.getElementById('solar').value) || 0;
+
+            energyChart.data.datasets.forEach((dataset, i) => {
+                if (i < labels.length) {
+                    const originalIndex = labels.length - 1 - i;
+                    dataset.data = [newStandardData[originalIndex], newDesignData[originalIndex], 0];
+                } else {
+                    dataset.data = [0, 0, newSolarData];
+                }
+            });
+            energyChart.update('none'); // アニメーションなしで更新
+
+            const designTotal = newDesignData.reduce((a, b) => a + b, 0);
+            const standardTotal = newStandardData.reduce((a, b) => a + b, 0);
+            
+            let reductionRateDesign = standardTotal > 0 ? ((standardTotal - designTotal) / standardTotal) * 100 : 0;
+            let reductionRateSolar = standardTotal > 0 ? ((standardTotal - (designTotal - newSolarData)) / standardTotal) * 100 : 0;
+
+            document.getElementById('summary-standard').innerHTML = `${new Intl.NumberFormat('ja-JP').format(standardTotal)} <span class="text-base font-normal">MJ</span>`;
+            document.getElementById('summary-design').innerHTML = `${new Intl.NumberFormat('ja-JP').format(designTotal)} <span class="text-base font-normal">MJ</span>`;
+            document.getElementById('summary-solar').innerHTML = `${new Intl.NumberFormat('ja-JP').format(newSolarData)} <span class="text-base font-normal">MJ</span>`;
+            document.getElementById('summary-reduction-rate-design').innerHTML = `${reductionRateDesign.toFixed(1)} <span class="text-base font-normal">%</span>`;
+            document.getElementById('summary-reduction-rate-solar').innerHTML = `${reductionRateSolar.toFixed(1)} <span class="text-base font-normal">%</span>`;
+        }
+        
+        function initializeInputs() {
+            initialData.design.forEach((val, i) => document.getElementById(`design-${i}`).value = val);
+            initialData.standard.forEach((val, i) => document.getElementById(`standard-${i}`).value = val);
+            document.getElementById('solar').value = initialData.solar;
+            updateChartAndSummaries();
+        }
+
+        initializeInputs();
+    </script>
+</body>
+</html>
